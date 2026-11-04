@@ -35,6 +35,7 @@ void setup() {
 }
 
 void loop() {
-  webSocket.loop();      // verifica se chegou comando novo da página
-  server.handleClient(); // atende quem está abrindo a página
+  webSocket.loop();          // verifica se chegou comando novo da página
+  server.handleClient();     // atende quem está abrindo a página
+  atualizarAceleracao();     // atualiza a rampa de velocidade continuamente
 }

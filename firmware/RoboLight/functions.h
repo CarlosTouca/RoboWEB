@@ -41,7 +41,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t tamanho
   // Velocidade: "V80" = 80%. atoi(msg + 1) lê o número depois do "V"
   if (msg[0] == 'V') {
     velPct = constrain(atoi(msg + 1), 0, 100);   // garante que fica entre 0 e 100
-    return;                                      // vale a partir da próxima direção apertada
+    atualizarAlvos();                             // Recalcula o alvo do PWM máximo imediatamente
+    return;                                      
   }
 
   // Comandos de direção: uma letra só

@@ -1,5 +1,3 @@
-// ===== Página web do RoboLight (fica guardada na memória flash) =====
-// Controles: 4 direções (segure para andar, solte para parar), barra de velocidade e LED
 const char webpageCode[] PROGMEM = R"=====(
 <!DOCTYPE html>
 <html lang="pt">
@@ -17,11 +15,13 @@ const char webpageCode[] PROGMEM = R"=====(
       --primary-hover: #0369a1;  /* azul ao passar o mouse */
       --primary-active: #0c4a6e; /* azul ao apertar */
       --medical-green: #10b981;  /* verde (conectado / LED ligado) */
-      --medical-red: #dc2626;    /* vermelho (desconectado) */
+      --medical-red: #dc2626;    /* vermelho (desconectado / emergência) */
+      --uv-purple: #6d28d9;      /* roxo das lâmpadas UVC */
       --text-dark: #1e293b;      /* texto principal */
       --text-muted: #64748b;     /* texto secundário */
       --border-color: #cbd5e1;   /* bordas */
-      --btn-bg: #f8fafc;         /* fundo do botão do LED */
+      --btn-bg: #f8fafc;         /* fundo dos botões claros */
+      --dpad-size: min(220px, 24vh); /* tamanho da cruz de direção (diminui em telas baixas) */
     }
 
     /* Zera margens e usa a mesma fonte em tudo; user-select evita selecionar texto ao segurar o botão */
@@ -44,15 +44,17 @@ const char webpageCode[] PROGMEM = R"=====(
       padding-bottom: 20px;
     }
 
-    /* ---------- Barra superior ---------- */
+    /* ---------- Barra superior: logo | painéis de tempo | status da conexão ---------- */
     .top-bar {
       width: 100%;
       background-color: var(--header-bg);
       color: #ffffff;
-      padding: 12px 20px;
+      padding: 8px 20px;
       display: flex;
-      justify-content: space-between; /* logo à esquerda, status à direita */
+      justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       margin-bottom: 20px;
     }
@@ -62,6 +64,55 @@ const char webpageCode[] PROGMEM = R"=====(
       font-size: 1.5rem;
       font-weight: bold;
     }
+    
+    .paineis-tempo {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* Tempos: grandes, no meio da barra; ficam iluminados com o robô ou UVC ligados */
+    #painel-tempo, #painel-uv {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 4px 24px;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.25);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    
+    #painel-tempo .rotulo, #painel-uv .rotulo {
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    #tempo-ativo, #tempo-uv {
+      font-family: monospace;
+      font-size: 2rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: #ffffff;
+    }
+    
+    #painel-tempo.ativo {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--medical-green);
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+    }
+    #painel-tempo.ativo #tempo-ativo { color: #6ee7b7; }
+
+    #painel-uv.ativo {
+      background: rgba(109, 40, 217, 0.2);
+      border-color: var(--uv-purple);
+      box-shadow: 0 0 16px rgba(109, 40, 217, 0.5);
+    }
+    #painel-uv.ativo #tempo-uv { color: #d8b4fe; } /* Roxo claro */
 
     /* Etiqueta "Conectado / Desconectado" */
     .status-badge {
@@ -84,16 +135,26 @@ const char webpageCode[] PROGMEM = R"=====(
     }
     .status-dot.online { background-color: var(--medical-green); }
 
-    /* ---------- Layout: no celular um cartão embaixo do outro, no PC lado a lado ---------- */
-    .dashboard {
+    /* No celular estreito some o texto dos cronômetros para caber tudo na barra */
+    @media (max-width: 580px) {
+      #painel-tempo .rotulo, #painel-uv .rotulo { display: none; }
+      .paineis-tempo { gap: 6px; }
+      #painel-tempo, #painel-uv { padding: 4px 12px; gap: 8px; }
+      #tempo-ativo, #tempo-uv { font-size: 1.5rem; letter-spacing: 1px; }
+    }
+
+    /* ---------- Área principal (em telas pequenas os blocos ficam um embaixo do outro) ---------- */
+    .app {
       display: flex;
       flex-direction: column;
       gap: 20px;
       width: 95%;
       max-width: 1200px;
     }
-    @media (min-width: 768px) {
-      .dashboard { flex-direction: row; align-items: stretch; }
+    .coluna-esq, .coluna-dir {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
 
     /* ---------- Cartões ---------- */
@@ -102,17 +163,16 @@ const char webpageCode[] PROGMEM = R"=====(
       border-radius: 12px;
       border: 1px solid var(--border-color);
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      flex: 1;
+      flex: none;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-    .card-video { flex: 1.6; } /* o vídeo ocupa mais espaço que os controles */
 
     .card-header {
       background: #f8fafc;
-      padding: 12px 16px;
-      font-size: 0.9rem;
+      padding: 8px 16px;
+      font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
       border-bottom: 1px solid var(--border-color);
@@ -124,7 +184,7 @@ const char webpageCode[] PROGMEM = R"=====(
     }
 
     .card-body {
-      padding: 20px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -132,26 +192,78 @@ const char webpageCode[] PROGMEM = R"=====(
       flex: 1;
     }
 
-    /* ---------- Vídeo da câmera (proporção 16:9) ---------- */
+    /* Mensagem de estado no topo do controle (robô desligado, ligado, sem conexão...) */
+    .aviso-controle {
+      width: 100%;
+      margin-bottom: clamp(6px, 1.5vh, 14px);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+    .aviso-controle.ok   { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .aviso-controle.erro { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+
+    /* ---------- Vídeo da câmera ---------- */
     .video-container {
       width: 100%;
       aspect-ratio: 16 / 9;
-      min-height: 320px;
       border-radius: 8px;
       overflow: hidden;
       background: #0f172a;
       border: 1px solid var(--border-color);
+      position: relative;
     }
-    iframe { width: 100%; height: 100%; border: none; }
 
-    /* ---------- Botões de direção: grade 3x3, só as 4 setas ficam preenchidas ---------- */
+    #camera {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* ---------- Botão de emergência: separado, grande e sempre liberado ---------- */
+    .btn-emergencia {
+      width: 100%;
+      min-height: clamp(44px, 8vh, 72px);
+      margin-top: clamp(16px, 3vh, 24px); /* Espaço acima do botão, após a velocidade */
+      background-color: var(--medical-red);
+      color: #ffffff;
+      border: 3px solid #7f1d1d;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.2), 0 4px 8px rgba(220, 38, 38, 0.4);
+      transition: all 0.15s ease;
+      touch-action: none;
+    }
+    .btn-emergencia:hover { background-color: #b91c1c; }
+    .btn-emergencia:active, .btn-emergencia.active-press {
+      background-color: #991b1b;
+      transform: scale(0.98);
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.2);
+    }
+
+    /* ---------- Botões de direção: grade 3x3, 4 setas e o botão de parar no centro ---------- */
     .dpad {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       grid-template-rows: repeat(3, 1fr);
-      gap: 10px;
-      width: 220px;
-      height: 220px;
+      gap: 8px;
+      width: var(--dpad-size);
+      height: var(--dpad-size);
     }
 
     .btn-cmd {
@@ -159,7 +271,7 @@ const char webpageCode[] PROGMEM = R"=====(
       color: #ffffff;
       border: 1px solid var(--header-bg);
       border-radius: 10px;
-      font-size: 1.8rem;
+      font-size: 1.6rem;
       font-weight: bold;
       cursor: pointer;
       display: flex;
@@ -167,215 +279,525 @@ const char webpageCode[] PROGMEM = R"=====(
       align-items: center;
       transition: all 0.15s ease;
       box-shadow: 0 2px 4px rgba(1, 24, 36, 0.3);
-      touch-action: none; /* no celular, segurar o botão não rola a página */
+      touch-action: none;
     }
-    /* Mouse em cima */
     .btn-cmd:hover { background-color: var(--primary-hover); box-shadow: 0 4px 6px rgba(2, 132, 199, 0.4); }
-    /* Botão apertado (mouse, dedo ou tecla do teclado) */
     .btn-cmd:active, .btn-cmd.active-press {
       background-color: var(--primary-active);
       transform: scale(0.96);
       box-shadow: none;
     }
 
-    /* Botão de parar (centro das setas): vermelho */
     .btn-stop {
       background-color: var(--medical-red);
       border-color: #7e1010;
-      font-size: 1.3rem;
+      font-size: 1.2rem;
       box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
     }
     .btn-stop:hover { background-color: #b91c1c; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.4); }
     .btn-stop:active, .btn-stop.active-press { background-color: #991b1b; }
 
-    /* Dica de teclado embaixo dos botões */
+    .btn-cmd:disabled,
+    .btn-cmd:disabled:hover,
+    .btn-cmd:disabled:active {
+      background-color: var(--header-bg);
+      opacity: 0.35;
+      transform: none;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
     .kb-hint {
-      margin-top: 15px;
-      font-size: 0.8rem;
+      margin-top: 10px;
+      font-size: 0.75rem;
       color: var(--text-muted);
       text-align: center;
+    }
+    @media (max-height: 760px) {
+      .kb-hint { display: none; }
     }
 
     /* ---------- Barra de velocidade ---------- */
     .speed-section {
       width: 100%;
       max-width: 260px;
-      margin-top: 20px;
-      padding-top: 15px;
+      margin-top: clamp(8px, 2vh, 20px);
+      padding-top: clamp(6px, 1.5vh, 15px);
       border-top: 1px dashed var(--border-color);
       text-align: center;
     }
     .speed-label {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     #velocidade {
       width: 100%;
-      accent-color: var(--primary-blue); /* cor da barra e da bolinha */
+      accent-color: var(--primary-blue);
       cursor: pointer;
     }
 
-    /* ---------- Botão da luz auxiliar ---------- */
-    .light-section {
+    /* ---------- Lâmpadas: um botão grande pegando a largura toda ---------- */
+    .lamp-grid {
       width: 100%;
-      margin-top: 20px;
-      padding-top: 15px;
-      border-top: 1px dashed var(--border-color);
       display: flex;
-      justify-content: center;
     }
 
-    #btn-led {
+    .lamp-btn {
       width: 100%;
-      max-width: 220px;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--text-dark);
+      min-height: clamp(60px, 10vh, 96px);
+      padding: 8px;
+      border-radius: 12px;
+      border: 2px solid var(--border-color);
       background: var(--btn-bg);
+      color: var(--text-dark);
+      font-size: 1rem;
+      font-weight: bold;
       cursor: pointer;
       transition: all 0.25s ease;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
     }
-    /* LED ligado: o botão fica verde */
-    #btn-led.on {
-      background: #ecfdf5;
-      color: var(--medical-green);
-      border-color: #a7f3d0;
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+
+    .lamp-estado {
+      font-size: 0.8rem;
+      padding: 2px 12px;
+      border-radius: 20px;
+      background: #e2e8f0;
+      color: var(--text-muted);
+    }
+
+    #btn-uv {
+      border-color: var(--uv-purple);
+      color: var(--uv-purple);
+    }
+    #btn-uv.on {
+      background: var(--uv-purple);
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(109, 40, 217, 0.45);
+    }
+    #btn-uv.on .lamp-estado { background: #ffffff; color: var(--uv-purple); }
+    #btn-uv:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .uv-aviso {
+      margin-top: clamp(8px, 1.5vh, 16px);
+      font-size: 0.75rem;
+      color: var(--medical-red);
+      text-align: center;
+      font-weight: 600;
+    }
+
+    /* ---------- Checklist de segurança ---------- */
+    .checklist {
+      width: 100%;
+      background: var(--panel-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    .cl-corpo {
+      display: flex;
+      flex-direction: column;
+    }
+    .cl-itens {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .cl-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      line-height: 1.2;
+      cursor: pointer;
+    }
+    .cl-item input {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: var(--medical-green);
+    }
+    .cl-item input:disabled { cursor: not-allowed; }
+
+    .cl-rodape {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+    #contador {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    #btn-ligar {
+      width: 100%;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #ffffff;
+      background: var(--medical-green);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    #btn-ligar:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    #btn-ligar.desligar { background: var(--medical-red); }
+
+    /* ---------- Janela de confirmação das lâmpadas UVC ---------- */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal.aberto { display: flex; }
+
+    .modal-caixa {
+      width: 100%;
+      max-width: 380px;
+      background: var(--panel-bg);
+      border: 2px solid var(--uv-purple);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .modal-titulo {
+      background: var(--uv-purple);
+      color: #ffffff;
+      padding: 12px 16px;
+      font-weight: bold;
+    }
+    .modal-texto {
+      padding: 12px 16px;
+      font-size: 0.9rem;
+    }
+    .modal .cl-item { font-size: 0.95rem; padding: 12px 16px; }
+    .modal-botoes {
+      display: flex;
+      gap: 10px;
+      padding: 12px 16px;
+    }
+    .modal-botoes button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--btn-bg);
+      color: var(--text-dark);
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #btn-uv-confirmar {
+      background: var(--uv-purple);
+      border-color: var(--uv-purple);
+      color: #ffffff;
+    }
+    #btn-uv-confirmar:disabled {
+      background: #c4b5fd;
+      border-color: #c4b5fd;
+      cursor: not-allowed;
+    }
+
+    /* =====================================================================
+       TELA ÚNICA SEM ROLAGEM
+       ===================================================================== */
+    @media (min-width: 1000px) and (min-height: 600px) {
+      html, body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        padding-bottom: 0;
+      }
+      .top-bar {
+        flex: none;
+        margin-bottom: 0;
+      }
+
+      .app {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        max-width: 1400px;
+        padding: 12px;
+        flex-direction: row;
+        gap: 12px;
+        overflow: hidden;
+      }
+      .coluna-esq {
+        width: clamp(300px, 28vw, 380px);
+        flex: none;
+        min-height: 0;
+        gap: 12px;
+      }
+      .coluna-dir {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        gap: 12px;
+      }
+
+      .card-mov, .card-video {
+        flex: 1;
+        min-height: 0;
+      }
+      .card-body {
+        padding: 12px;
+        min-height: 0;
+      }
+
+      .video-container {
+        flex: 1;
+        min-height: 0;
+        aspect-ratio: auto;
+      }
+
+      .cl-corpo { flex-direction: row; }
+      .cl-itens { grid-template-columns: repeat(3, 1fr); }
+      .cl-rodape {
+        width: 210px;
+        flex: none;
+        border-left: 1px solid var(--border-color);
+      }
+    }
+
+    @media (min-width: 1000px) and (max-height: 760px) {
+      #tempo-ativo, #tempo-uv { font-size: 1.6rem; }
     }
   </style>
 </head>
-<body oncontextmenu="return false"> <!-- bloqueia o menu do toque longo no celular -->
+<body oncontextmenu="return false">
 
-  <!-- Barra superior com logo e status da conexão -->
+  <!-- Barra superior: logo, tempos e status da conexão -->
   <header class="top-bar">
     <span class="brand-icon">&#10010;</span>
+
+    <div class="paineis-tempo">
+      <!-- Tempo de funcionamento geral -->
+      <div id="painel-tempo">
+        <span class="rotulo">Tempo ativo</span>
+        <span id="tempo-ativo">00:00:00</span>
+      </div>
+
+      <!-- Tempo de desinfecção (UVC) -->
+      <div id="painel-uv">
+        <span class="rotulo">Tempo UVC</span>
+        <span id="tempo-uv">00:00:00</span>
+      </div>
+    </div>
+
     <div class="status-badge">
       <span id="status-dot" class="status-dot"></span>
       <span id="status-text">Desconectado</span>
     </div>
   </header>
 
-  <div class="dashboard">
+  <main class="app">
 
-    <!-- Cartão de controle: setas, velocidade e LED -->
-    <div class="card">
-      <div class="card-header">
-        <span>Controle de Movimentação</span>
-        <span>&#8644;</span>
-      </div>
-      <div class="card-body">
+    <!-- Coluna da esquerda: movimento e lâmpadas -->
+    <div class="coluna-esq">
 
-        <!-- Setas: pointerdown = apertou (manda a direção), pointerup/leave/cancel = soltou (manda parar) -->
-        <div class="dpad">
-          <div></div>
-          <button class="btn-cmd" id="btn-up"    onpointerdown="iniciar('F')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&uarr;</button>
-          <div></div>
-
-          <button class="btn-cmd" id="btn-left"  onpointerdown="iniciar('E')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&larr;</button>
-          <!-- Parar: manda "P" assim que apertar -->
-          <button class="btn-cmd btn-stop" id="btn-stop" onpointerdown="enviar('P')">&#9632;</button>
-          <button class="btn-cmd" id="btn-right" onpointerdown="iniciar('D')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&rarr;</button>
-
-          <div></div>
-          <button class="btn-cmd" id="btn-down"  onpointerdown="iniciar('T')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&darr;</button>
-          <div></div>
+      <!-- Cartão de movimento -->
+      <div class="card card-mov">
+        <div class="card-header">
+          <span>Controle de Movimentação</span>
+          <span>&#8644;</span>
         </div>
+        <div class="card-body">
 
-        <div class="kb-hint">Segure para andar, solte para parar<br>Teclado: WASD ou Setas | Espaço para parar</div>
+          <!-- Mensagem de estado -->
+          <p id="aviso-controle" class="aviso-controle">Robô desligado.</p>
 
-        <!-- Barra de velocidade de 0% a 100% -->
-        <div class="speed-section">
-          <div class="speed-label">Velocidade: <span id="velTexto">100</span>%</div>
-          <!-- oninput: atualiza o número enquanto arrasta; onchange: envia ao robô quando soltar -->
-          <input type="range" id="velocidade" min="0" max="100" step="5" value="100"
-                 oninput="document.getElementById('velTexto').innerText = this.value"
-                 onchange="enviar('V' + this.value)">
-        </div>
+          <!-- Setas -->
+          <div class="dpad">
+            <div></div>
+            <button class="btn-cmd controle" id="btn-up"    onpointerdown="iniciar('F')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&uarr;</button>
+            <div></div>
 
-        <!-- Botão da luz auxiliar -->
-        <div class="light-section">
-          <button id="btn-led" onclick="alternaLed()">
-            <span>Iluminação Auxiliar: OFF</span>
+            <button class="btn-cmd controle" id="btn-left"  onpointerdown="iniciar('E')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&larr;</button>
+            <button class="btn-cmd btn-stop" id="btn-stop-centro" onpointerdown="pararRobo()">&#9632;</button>
+            <button class="btn-cmd controle" id="btn-right" onpointerdown="iniciar('D')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&rarr;</button>
+
+            <div></div>
+            <button class="btn-cmd controle" id="btn-down"  onpointerdown="iniciar('T')" onpointerup="parar()" onpointerleave="parar()" onpointercancel="parar()">&darr;</button>
+            <div></div>
+          </div>
+
+          <div class="kb-hint">Segure para andar, solte para parar<br>Teclado: WASD ou Setas | Espaço = emergência</div>
+
+          <!-- Barra de velocidade -->
+          <div class="speed-section">
+            <div class="speed-label">Velocidade: <span id="velTexto">100</span>%</div>
+            <input type="range" id="velocidade" min="0" max="100" step="5" value="100"
+                   oninput="document.getElementById('velTexto').innerText = this.value"
+                   onchange="enviar('V' + this.value)">
+          </div>
+
+          <!-- Emergência: Reposicionada para o fim dos controles de movimento -->
+          <button class="btn-emergencia" id="btn-stop" onpointerdown="emergencia()">
+            <span>&#9632;</span><span>Parada de emergência</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Cartão das lâmpadas UVC -->
+      <div class="card">
+        <div class="card-header">
+          <span>Desinfecção UVC</span>
+          <span>&#128161;</span>
+        </div>
+        <div class="card-body">
+          <div class="lamp-grid">
+            <!-- UVC -->
+            <button id="btn-uv" class="lamp-btn controle" onclick="alternaUv()">
+              <span>Lâmpadas UVC</span>
+              <span class="lamp-estado" id="uv-estado">OFF</span>
+            </button>
+          </div>
+          <p class="uv-aviso">Luz UVC é nociva à pele e aos olhos. Só ligue com a área vazia.</p>
         </div>
       </div>
     </div>
 
-    <!-- Cartão da câmera -->
-    <div class="card card-video">
-      <div class="card-header">
-        <span>Monitoramento de Vídeo</span>
-        <span>&#128065;</span>
-      </div>
-      <div class="card-body">
-        <div class="video-container">
-          <!-- Troque pelo IP da sua câmera -->
-          <iframe src="http://192.168.0.176:8080/" title="Câmera do Robô"></iframe>
+    <!-- Coluna da direita: vídeo em cima e checklist embaixo -->
+    <div class="coluna-dir">
+      <!-- Cartão da câmera -->
+      <div class="card card-video">
+        <div class="card-header">
+          <span>Monitoramento de Vídeo</span>
+          <span>&#128065;</span>
         </div>
+        <div class="card-body">
+          <div class="video-container">
+            <img id="camera" src="http://192.168.0.176:8080/video" alt="Câmera do Robô">
+          </div>
+        </div>
+      </div>
+
+      <!-- Checklist de segurança -->
+      <section class="checklist">
+        <div class="card-header">
+          <span>Checklist de Segurança</span>
+          <span>&#9745;</span>
+        </div>
+        <div class="cl-corpo">
+          <div class="cl-itens">
+            <label class="cl-item"><input type="checkbox" class="check"> Área livre de pessoas e obstáculos</label>
+            <label class="cl-item"><input type="checkbox" class="check"> Bateria conectada e carregada</label>
+            <label class="cl-item"><input type="checkbox" class="check"> Fios e pontes H firmes</label>
+            <label class="cl-item"><input type="checkbox" class="check"> Rodas livres, sem travar</label>
+            <label class="cl-item"><input type="checkbox" class="check"> Operador sabe onde está a emergência</label>
+            <label class="cl-item"><input type="checkbox" class="check"> Ninguém na área de ação das UVC</label>
+          </div>
+          <div class="cl-rodape">
+            <p id="contador">0 de 6 itens marcados</p>
+            <button id="btn-ligar" disabled>Ligar robô</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Janela de confirmação das lâmpadas UVC -->
+  <div id="modal-uv" class="modal">
+    <div class="modal-caixa">
+      <div class="modal-titulo">Ligar lâmpadas UVC</div>
+      <p class="modal-texto">A luz UVC causa queimaduras na pele e danos aos olhos. Confirme antes de ligar:</p>
+      <label class="cl-item"><input type="checkbox" class="check-uv"> Não há pessoas nem animais na área</label>
+      <label class="cl-item"><input type="checkbox" class="check-uv"> Estou fora da linha de visão das lâmpadas</label>
+      <div class="modal-botoes">
+        <button id="btn-uv-cancelar">Cancelar</button>
+        <button id="btn-uv-confirmar" disabled>Ligar UVC</button>
       </div>
     </div>
   </div>
 
   <script>
-    var websock;            // conexão com o robô
-    var movendo = false;    // true enquanto algum botão de direção está apertado
+    var websock;
+    var movendo = false;
+    var ligado = false;
+    var conectado = false;
+    var perdeuConexao = false;
 
-    // Conecta no robô pelo WebSocket (porta 81, mesmo endereço da página)
     function InitWebSocket() {
       websock = new WebSocket('ws://' + window.location.hostname + ':81/');
 
-      // Conectou: bolinha verde
       websock.onopen = function () {
+        conectado = true;
         document.getElementById('status-dot').classList.add('online');
         document.getElementById('status-text').innerText = 'Conectado';
+        atualizarChecklist();
       };
 
-      // O robô mandou algo: "ON", "OFF" (LED) ou "V50" (velocidade em %)
       websock.onmessage = function (evt) {
         var msg = evt.data;
-        var btnLed = document.getElementById('btn-led');
 
-        if (msg == 'ON') {
-          btnLed.innerHTML = '<span>Iluminação Auxiliar: ON</span>';
-          btnLed.classList.add('on');
-        } else if (msg == 'OFF') {
-          btnLed.innerHTML = '<span>Iluminação Auxiliar: OFF</span>';
-          btnLed.classList.remove('on');
+        if (msg == 'UVON') {
+          mostrarUv(true);
+        } else if (msg == 'UVOFF') {
+          mostrarUv(false);
         } else if (msg[0] == 'V') {
-          var vel = msg.substring(1);                       // tira o "V" e fica só o número
+          var vel = msg.substring(1);
           document.getElementById('velocidade').value = vel;
           document.getElementById('velTexto').innerText = vel;
         }
       };
 
-      // Caiu a conexão: bolinha vermelha e tenta de novo em 2 segundos
       websock.onclose = function () {
+        conectado = false;
         document.getElementById('status-dot').classList.remove('online');
         document.getElementById('status-text').innerText = 'Desconectado';
+        if (ligado) {
+          perdeuConexao = true;
+          desligarRobo();
+        }
+        mostrarUv(false);
+        atualizarChecklist();
         setTimeout(InitWebSocket, 2000);
       };
     }
 
-    // Manda uma mensagem ao robô (só se a conexão estiver aberta)
     function enviar(msg) {
       if (websock && websock.readyState == 1) websock.send(msg);
     }
 
-    // Apertou uma direção: marca que está andando e manda a letra (F, T, E ou D)
     function iniciar(cmd) {
+      if (!ligado) return;
       movendo = true;
       enviar(cmd);
     }
 
-    // Soltou: se estava andando, manda "P" (parado) uma única vez
     function parar() {
       if (movendo) {
         movendo = false;
@@ -383,39 +805,250 @@ const char webpageCode[] PROGMEM = R"=====(
       }
     }
 
-    // Liga ou desliga o LED conforme o estado atual do botão
-    function alternaLed() {
-      var ligado = document.getElementById('btn-led').classList.contains('on');
-      enviar(ligado ? 'OFF' : 'ON');
+    function pararRobo() {
+      movendo = false;
+      enviar('P');
     }
 
-    // ---------- Teclado: cada tecla → [letra do comando, id do botão na tela] ----------
+    function emergencia() {
+      movendo = false;
+      enviar('P');
+      enviar('UVOFF');
+    }
+
+    function mostrarUv(ativo) {
+      document.getElementById('uv-estado').textContent = ativo ? 'ON' : 'OFF';
+      if (ativo) {
+        document.getElementById('btn-uv').classList.add('on');
+        iniciarContadorUv();
+      } else {
+        document.getElementById('btn-uv').classList.remove('on');
+        pararContadorUv();
+      }
+    }
+
+    var modalUv = document.getElementById('modal-uv');
+    var checksUv = document.querySelectorAll('.check-uv');
+    var btnUvConfirmar = document.getElementById('btn-uv-confirmar');
+
+    function atualizarModalUv() {
+      var todos = true;
+      checksUv.forEach(function (c) {
+        if (!c.checked) todos = false;
+      });
+      btnUvConfirmar.disabled = !todos;
+    }
+
+    checksUv.forEach(function (c) {
+      c.addEventListener('change', atualizarModalUv);
+    });
+
+    function abrirModalUv() {
+      checksUv.forEach(function (c) { c.checked = false; });
+      atualizarModalUv();
+      modalUv.classList.add('aberto');
+    }
+
+    function fecharModalUv() {
+      modalUv.classList.remove('aberto');
+    }
+
+    document.getElementById('btn-uv-cancelar').addEventListener('click', fecharModalUv);
+
+    btnUvConfirmar.addEventListener('click', function () {
+      fecharModalUv();
+      enviar('UVON');
+    });
+
+    function alternaUv() {
+      if (!ligado) return;
+      var uvLigado = document.getElementById('btn-uv').classList.contains('on');
+      if (uvLigado) {
+        enviar('UVOFF');
+      } else {
+        abrirModalUv();
+      }
+    }
+
+    var checks = document.querySelectorAll('.check');
+    var btnLigar = document.getElementById('btn-ligar');
+    var contador = document.getElementById('contador');
+
+    function atualizarAviso() {
+      var aviso = document.getElementById('aviso-controle');
+      if (ligado) {
+        aviso.textContent = 'Robô ligado: comandos liberados.';
+        aviso.className = 'aviso-controle ok';
+      } else if (perdeuConexao) {
+        aviso.textContent = 'Conexão perdida: o robô foi desligado por segurança. Refaça o checklist para ligar de novo.';
+        aviso.className = 'aviso-controle erro';
+      } else if (!conectado) {
+        aviso.textContent = 'Sem conexão com o robô.';
+        aviso.className = 'aviso-controle erro';
+      } else {
+        aviso.textContent = 'Robô desligado: conclua o checklist (abaixo do vídeo) e clique em Ligar robô.';
+        aviso.className = 'aviso-controle';
+      }
+    }
+
+    function atualizarChecklist() {
+      var marcados = 0;
+      checks.forEach(function (c) {
+        if (c.checked) marcados++;
+      });
+
+      var texto = marcados + ' de ' + checks.length + ' itens marcados';
+      if (!conectado) texto += ' | sem conexão com o robô';
+      contador.textContent = texto;
+
+      if (!ligado) {
+        btnLigar.disabled = (marcados !== checks.length) || !conectado;
+      }
+      atualizarAviso();
+    }
+
+    checks.forEach(function (c) {
+      c.addEventListener('change', atualizarChecklist);
+    });
+
+    function liberarControles(liberado) {
+      document.querySelectorAll('.controle').forEach(function (b) {
+        b.disabled = !liberado;
+      });
+    }
+
+    var painelTempo = document.getElementById('painel-tempo');
+    var tempoAtivo = document.getElementById('tempo-ativo');
+    var inicio = 0;
+    var intervalo = null;
+
+    function doisDigitos(n) {
+      return n < 10 ? '0' + n : String(n);
+    }
+
+    function formatarTempo(total) {
+      var h = Math.floor(total / 3600);
+      var m = Math.floor((total % 3600) / 60);
+      var s = total % 60;
+      return doisDigitos(h) + ':' + doisDigitos(m) + ':' + doisDigitos(s);
+    }
+
+    function atualizarTempo() {
+      tempoAtivo.textContent = formatarTempo(Math.floor((Date.now() - inicio) / 1000));
+    }
+
+    function iniciarContador() {
+      if (intervalo !== null) return;
+      inicio = Date.now();
+      atualizarTempo();
+      intervalo = setInterval(atualizarTempo, 1000);
+      painelTempo.classList.add('ativo');
+    }
+
+    function pararContador() {
+      clearInterval(intervalo);
+      intervalo = null;
+      painelTempo.classList.remove('ativo');
+    }
+
+    var painelUv = document.getElementById('painel-uv');
+    var tempoUv = document.getElementById('tempo-uv');
+    var inicioUv = 0;
+    var intervaloUv = null;
+
+    function atualizarTempoUv() {
+      tempoUv.textContent = formatarTempo(Math.floor((Date.now() - inicioUv) / 1000));
+    }
+
+    function iniciarContadorUv() {
+      if (intervaloUv !== null) return;
+      inicioUv = Date.now();
+      atualizarTempoUv();
+      intervaloUv = setInterval(atualizarTempoUv, 1000);
+      painelUv.classList.add('ativo');
+    }
+
+    function pararContadorUv() {
+      clearInterval(intervaloUv);
+      intervaloUv = null;
+      painelUv.classList.remove('ativo');
+    }
+
+    function ligarRobo() {
+      if (!conectado) return;
+      ligado = true;
+      perdeuConexao = false;
+      btnLigar.textContent = 'Desligar robô';
+      btnLigar.classList.add('desligar');
+      btnLigar.disabled = false;
+      checks.forEach(function (c) { c.disabled = true; });
+      liberarControles(true);
+      iniciarContador();
+      atualizarChecklist();
+    }
+
+    function desligarRobo() {
+      movendo = false;
+      enviar('P');
+      enviar('UVOFF');
+      fecharModalUv();
+      ligado = false;
+      pararContador();
+      btnLigar.textContent = 'Ligar robô';
+      btnLigar.classList.remove('desligar');
+      liberarControles(false);
+      checks.forEach(function (c) {
+        c.disabled = false;
+        c.checked = false;
+      });
+      atualizarChecklist();
+    }
+
+    btnLigar.addEventListener('click', function () {
+      if (ligado) {
+        desligarRobo();
+      } else {
+        ligarRobo();
+      }
+      btnLigar.blur();
+    });
+
     var teclas = {
       'w': ['F', 'btn-up'],    'arrowup':    ['F', 'btn-up'],
       's': ['T', 'btn-down'],  'arrowdown':  ['T', 'btn-down'],
       'a': ['E', 'btn-left'],  'arrowleft':  ['E', 'btn-left'],
       'd': ['D', 'btn-right'], 'arrowright': ['D', 'btn-right'],
-      ' ': ['P', 'btn-stop']     // barra de espaço = parar
+      ' ': ['P', 'btn-stop']
     };
 
-    // Apertou uma tecla: anda e acende o botão correspondente
     document.addEventListener('keydown', function (e) {
+      if (e.target.type == 'checkbox') return;
       var t = teclas[e.key.toLowerCase()];
-      if (!t || e.repeat) return;       // ignora outras teclas e a repetição ao segurar
-      e.preventDefault();               // impede a página de rolar com as setas
-      iniciar(t[0]);
+      if (!t || e.repeat) return;
+      if (!ligado && t[0] != 'P') return;
+      if (modalUv.classList.contains('aberto') && t[0] != 'P') return;
+      e.preventDefault();
+      if (t[0] == 'P') {
+        emergencia();
+      } else {
+        iniciar(t[0]);
+      }
       document.getElementById(t[1]).classList.add('active-press');
     });
 
-    // Soltou a tecla: para e apaga o botão
     document.addEventListener('keyup', function (e) {
+      if (e.target.type == 'checkbox') return;
       var t = teclas[e.key.toLowerCase()];
       if (!t) return;
       parar();
       document.getElementById(t[1]).classList.remove('active-press');
     });
 
-    window.onload = InitWebSocket;      // conecta assim que a página carrega
+    window.onload = function () {
+      InitWebSocket();
+      liberarControles(false);
+      atualizarChecklist();
+    };
   </script>
 </body>
 </html>
