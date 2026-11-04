@@ -189,11 +189,52 @@ Mensagens enviadas da interface web ➔ ESP32:
 | `ComandoDirecao=T` | Movimento para trás |
 | `ComandoDirecao=E` | Rotação para a esquerda |
 | `ComandoDirecao=D` | Rotação para a direita |
-| `ComandoDirecao=G` / `I` | Diagonais para frente (esquerda / direita) |
-| `ComandoDirecao=H` / `J` | Diagonais para trás (esquerda / direita) |
 | `ComandoDirecao=P` | Para os motores imediatamente |
 | `LEDonoff=ON` / `OFF` | Liga ou desliga o módulo relé (lâmpadas UV-C) e os LEDs |
 | `Velocidade=<0-255>` | Define a velocidade dos motores (valor PWM de 0 a 255) |
+
+---
+
+## 📈 Controle de Aceleração Suave (Soft Start)
+
+A lógica de acionamento dos motores do RoboLight conta com um sistema de aceleração e desaceleração progressiva, substituindo a aplicação instantânea de PWM. Esta abordagem protege o hardware e melhora a usabilidade.
+
+### Arquitetura e Funcionamento
+
+- **Rotina Assíncrona (Non-Blocking):** O código evita o uso de laços `for` obstrutivos e funções como `delay()`. O controle de tempo é feito no backend (`loop()`) através do cronômetro de hardware `millis()`, processando incrementos discretos de PWM a cada 10 milissegundos. Isso mantém os loops de resposta do WebSocket (`webSocket.loop()`) e do servidor web sempre ativos e sem *timeouts*.
+- **Alvos Dinâmicos (Setpoints):** Ao deslizar a barra de velocidade na *dashboard* web, o usuário define a variável `velPct`. O ESP32 utiliza esse valor como **alvo** e recalcula instantaneamente os diferenciais de velocidade atual, aumentando ou reduzindo o PWM suavemente até atingir a nova meta.
+
+### Vantagens Clínicas e Técnicas
+
+- **Mitigação da Corrente de Partida (*Inrush Current*):** Corta picos extremos de corrente exigidos pelos motores CC para quebrar a inércia, protegendo os transistores das pontes H (BTS7960) e prevenindo quedas abruptas de tensão (*voltage sag*) na bateria principal.
+- **Preservação Eletromecânica:** A ausência de "trancos" elimina picos de torque excessivo nas caixas de redução dos motores, prolongando a vida útil das engrenagens.
+- **Tração Otimizada:** Evita a patinação das rodas e a perda de aderência, melhorando o controle direcional e a confiabilidade de movimentação no piso liso hospitalar.
+
+---
+
+## Sistema de Ligação das Lâmpadas UVC
+
+O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para desinfecção do ambiente. O acionamento é feito de forma isolada através de um módulo relé, garantindo que o circuito de potência em corrente alternada (AC) não interfira na lógica DC do microcontrolador.
+
+> **⚠️ AVISO DE SEGURANÇA:** A luz UVC causa danos irreversíveis aos olhos e à pele. O sistema exige a implementação de intertravamentos (sensores de presença ou fim de curso) para garantir o desligamento imediato das lâmpadas caso haja humanos próximos.
+
+### Componentes de Hardware
+* **Lâmpadas e Reatores:** 6x Lâmpadas UVC, alimentadas em pares por 3x Reatores Eletrônicos.
+* **Módulo de Acionamento:** Módulo Relé de 1 canal.
+* **Alimentação da Potência:** Bateria de 12V conectada a um Inversor de Tensão de 1000W (Saída 220V).
+* **Conexão AC:** Plug de tomada padrão macho conectado à saída do inversor.
+* **Controle:** Microcontrolador **ESP**.
+
+### Arquitetura de Fiação
+1. **Lógica:** O pino de controle do ESP envia o sinal de ativação para a porta `IN` do módulo relé.
+2. **Potência Primária:** A bateria de 12V alimenta o inversor de 1000W, gerando a saída de 220V AC na tomada.
+3. **Distribuição do Neutro:** O cabo neutro do plug de tomada é derivado e conectado diretamente a todos os 3 reatores.
+4. **Seccionamento da Fase:** O cabo de fase que sai do plug de tomada é conectado ao borne **NO** (Normalmente Aberto) do relé.
+5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) de todos os 3 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os três reatores simultaneamente.
+
+<p align="center">
+  <img src="images/placas_e_componentes/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="200">
+</p>
 
 ---
 
