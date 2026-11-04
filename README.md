@@ -233,7 +233,7 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) de todos os 3 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os três reatores simultaneamente.
 
 <p align="center">
-  <img src="images/placas_e_componentes/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="200">
+  <img src="images/placas_e_componentes/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
 </p>
 
 ---
