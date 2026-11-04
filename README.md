@@ -93,14 +93,6 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   <p align="center">
     <img src="images/placas_e_componentes/BTS7960.jpg" alt="Pinagem da ponte H BTS7960 (IBT-2)" width="380">
   </p>
-- **Módulo relé (FE_SRly):**
-  - `VCC` (`+`): 5V.
-  - `GND` (`-`): GND comum.
-  - `OUTPUT` (`S`): **GPIO 32** do ESP32.
-  - `COM` e `NO` (normalmente aberto): interrompem a fase (L) de 220V AC entre o inversor e os reatores.
-- **Regulador Step-Down LM2596:**
-  - `IN+` / `IN-`: bateria de 12V.
-  - `OUT+` / `OUT-`: regulados em **5,0V** para alimentar o ESP32, o relé e a lógica das pontes H.
 
 - **Display OLED SSD1306:**
   - `GND` e `VCC`: GND comum e alimentação.
@@ -111,39 +103,23 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
     <img src="images/placas_e_componentes/OLED.jpg" alt="Pinagem do display OLED SSD1306" width="260">
   </p>
 
-### 3. Pinagem do módulo relé (FE_SRly)
+- **Módulo relé (FE_SRly):**
+  - `VCC` (`+`): 5V.
+  - `GND` (`-`): GND comum.
+  - `OUTPUT` (`S`): **GPIO 32** do ESP32.
+  - `COM` e `NO` (normalmente aberto): interrompem a fase (L) de 220V AC entre o inversor e os reatores.
 
 <p align="center">
   <img src="images/placas_e_componentes/RELAY.jpg" alt="Pinagem do módulo relé" width="220">
 </p>
 
-| Pino do módulo | Conexão |
-| :--- | :--- |
-| **S / OUTPUT** (sinal) | **GPIO 32** do ESP32 |
-| **VCC** (`+`) | 5V |
-| **GND** (`-`) | GND comum |
-| **COM** (`CM`) | Fase (L) de 220V AC vinda do inversor |
-| **NO** (normalmente aberto) | Fase (L) de 220V AC em direção aos reatores |
-| **NC** (normalmente fechado) | Não utilizado |
-
-O relé interrompe a fase entre o inversor e os reatores: com o GPIO 32 em nível alto, o circuito fecha e as lâmpadas UV-C acendem.
-
-### 4. Pinagem do regulador Step-Down (LM2596)
+- **Regulador Step-Down LM2596:**
+  - `IN+` / `IN-`: bateria de 12V.
+  - `OUT+` / `OUT-`: regulados em **5,0V** para alimentar o ESP32, o relé e a lógica das pontes H.
 
 <p align="center">
   <img src="images/placas_e_componentes/DC5V.jpg" alt="Pinagem do regulador LM2596" width="200">
 </p>
-
-| Pino do módulo | Conexão |
-| :--- | :--- |
-| **INPUT +** (`IN+`) | Positivo da bateria de 12V |
-| **INPUT -** (`IN-`) | Negativo da bateria de 12V |
-| **OUTPUT +** (`OUT+`) | 5V para o pino VIN/5V do ESP32, o relé e a lógica das pontes H |
-| **OUTPUT -** (`OUT-`) | GND comum |
-
-Ajuste o trimpot (parafuso azul da placa) para **5,0V** medindo a saída com um multímetro, antes de ligar o ESP32.
-
----
 
 ## 🗂️ Estrutura do Repositório
 
