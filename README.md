@@ -50,13 +50,12 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
 | **Ponte H BTS7960 (IBT-2)** | 2 | Driver de alta corrente para motores CC (1 por motor) |
 | **Motores CC com rodas** | 2 | Compatíveis com o chassi do robô |
 | **Display OLED SSD1306** | 1 | 128x64 pixels, comunicação I²C (endereço `0x3C`) |
-| **Lâmpadas UV-C** | 5 | OSRAM PURITEC HNS 30W G13 (*ozone-free*, 254 nm) |
-| **Reatores eletrônicos** | 3 | Philips Basic EB240A16/26 P Bivolt |
+| **Lâmpadas UV-C** | 6 | OSRAM PURITEC HNS 30W G13 (*ozone-free*, 254 nm) |
+| **Reatores eletrônicos** | 6 | Philips Basic EB240A16/26 P Bivolt |
 | **Módulo relé (5V)** | 1 | Acionamento de potência do circuito UV-C |
 | **Inversor de tensão** | 1 | 12V DC para 220V AC (1000W contínuos) |
 | **Regulador Step-Down** | 1 | LM2596 (12V DC para 5V DC lógico) |
-| **Bateria principal** | 1 | Bateria 12V (alimenta motores e inversor) |
-| **Fonte / bateria do ESP32** | 1 | Alimentação separada e regulada para o microcontrolador |
+| **Bateria principal** | 1 | Bateria 12V |
 
 ---
 
@@ -233,7 +232,7 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) de todos os 3 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os três reatores simultaneamente.
 
 <p align="center">
-  <img src="images/placas_e_componentes/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
+  <img src="images/esquematicos/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
 </p>
 
 ---

@@ -1,46 +1,55 @@
-// ===== Controle dos motores com duas pontes H (BTS7960) e Aceleração Suave =====
+// ===== Controle dos motores com duas pontes H (BTS7960) e aceleração suave =====
+// Cada motor tem UMA velocidade com sinal: positivo = frente, negativo = trás.
+// Só um dos dois canais da ponte recebe PWM por vez (o outro fica em 0).
 const int FREQ = 5000;   // frequência do PWM em Hz
 const int RES  = 8;      // resolução de 8 bits (valores de 0 a 255)
 int velPct = 100;        // velocidade em % (0 a 100), muda pela barra da página
 
 // Pinos da ponte 1 (motor esquerdo) e da ponte 2 (motor direito)
-const int RPWM1 = 18;  // ponte 1, sentido 1
-const int LPWM1 = 19;  // ponte 1, sentido 2
-const int RPWM2 = 5;   // ponte 2, sentido 1
-const int LPWM2 = 17;  // ponte 2, sentido 2
+const int RPWM1 = 26;  // ponte 1, frente
+const int LPWM1 = 27;  // ponte 1, trás
+const int RPWM2 = 5;   // ponte 2, frente
+const int LPWM2 = 17;  // ponte 2, trás
 
-// --- Variáveis de aceleração ---
-int targetA = 0, targetB = 0, targetC = 0, targetD = 0; // Alvos calculados (0 a 255)
-float currentA = 0, currentB = 0, currentC = 0, currentD = 0; // Velocidade atual dos motores
-char sentidoAtual = 'P'; // Guarda a direção atual ('F', 'T', 'E', 'D', 'P')
+// Nomes por motor e sentido
+const int ESQ_FRENTE = RPWM1, ESQ_TRAS = LPWM1;
+const int DIR_FRENTE = RPWM2, DIR_TRAS = LPWM2;
+
+// PWM mínimo para o motor sair do lugar. Se o robô não anda em velocidades baixas, aumente (ex.: 60)
+const int PWM_MIN = 0;
+
+// --- Variáveis de aceleração (valores de -255 a 255) ---
+int alvoEsq = 0, alvoDir = 0;           // velocidade que queremos
+int atualEsq = 0, atualDir = 0;         // velocidade que o motor tem agora
+char sentidoAtual = 'P';                // direção atual ('F', 'T', 'E', 'D', 'P')
 
 unsigned long tempoAnteriorAcel = 0;
-const int INTERVALO_ACEL = 10; // Intervalo de atualização da rampa (ms)
-const float PASSO_ACEL   = 4.0; // Incremento de PWM por passo (aumente para acelerar mais rápido)
+const int INTERVALO_ACEL = 10;   // Intervalo de atualização da rampa (ms)
+const int PASSO_ACEL     = 4;    // Incremento de PWM por passo (aumente para acelerar mais rápido)
 
-// Prepara os 4 canais de PWM e liga cada um a um pino
+// Prepara o PWM dos 4 pinos (core 3.x: ledcAttach faz o papel de ledcSetup + ledcAttachPin)
 void Init_PonteH() {
-  for (int c = 0; c < 4; c++) ledcSetup(c, FREQ, RES); // configura os canais 0, 1, 2 e 3
-  ledcAttachPin(RPWM1, 0);  // canal 0 -> pino RPWM1
-  ledcAttachPin(LPWM1, 1);  // canal 1 -> pino LPWM1
-  ledcAttachPin(RPWM2, 2);  // canal 2 -> pino RPWM2
-  ledcAttachPin(LPWM2, 3);  // canal 3 -> pino LPWM2
+  ledcAttach(ESQ_FRENTE, FREQ, RES);
+  ledcAttach(ESQ_TRAS,   FREQ, RES);
+  ledcAttach(DIR_FRENTE, FREQ, RES);
+  ledcAttach(DIR_TRAS,   FREQ, RES);
 }
 
-// Converte a velocidade limite de % (0 a 100) para PWM (0 a 255)
+// Converte a velocidade limite de % (0 a 100) para PWM (PWM_MIN a 255)
 int vel() {
-  return velPct * 255 / 100;
+  if (velPct == 0) return 0;
+  return PWM_MIN + (255 - PWM_MIN) * velPct / 100;
 }
 
-// Recalcula o PWM máximo permitido de acordo com a direção e a velocidade da página Web
+// Recalcula as velocidades alvo de acordo com a direção e a velocidade da página
 void atualizarAlvos() {
   int v = vel();
   switch (sentidoAtual) {
-    case 'F': targetA = v; targetB = 0; targetC = v; targetD = 0; break; // Frente
-    case 'T': targetA = 0; targetB = v; targetC = 0; targetD = v; break; // Trás
-    case 'E': targetA = v; targetB = 0; targetC = 0; targetD = v; break; // Esquerda
-    case 'D': targetA = 0; targetB = v; targetC = v; targetD = 0; break; // Direita
-    case 'P': targetA = 0; targetB = 0; targetC = 0; targetD = 0; break; // Parado
+    case 'F': alvoEsq = -v; alvoDir = -v; break;  // Frente
+    case 'T': alvoEsq =  v; alvoDir =  v; break;  // Trás
+    case 'E': alvoEsq =  v; alvoDir = -v; break;  // Gira para a esquerda (se girar ao contrário, troque os sinais destas duas linhas)
+    case 'D': alvoEsq = -v; alvoDir =  v; break;  // Gira para a direita
+    default:  alvoEsq = 0;  alvoDir = 0;  break;  // Parado
   }
 }
 
@@ -49,10 +58,10 @@ void frente()   { sentidoAtual = 'F'; atualizarAlvos(); }
 void tras()     { sentidoAtual = 'T'; atualizarAlvos(); }
 void esquerda() { sentidoAtual = 'E'; atualizarAlvos(); }
 void direita()  { sentidoAtual = 'D'; atualizarAlvos(); }
-void parado()   { sentidoAtual = 'P'; atualizarAlvos(); }
+void parado()   { sentidoAtual = 'P'; atualizarAlvos(); }   // para com rampa
 
 // Calcula a transição suave de um valor PWM atual até o valor alvo
-float aproximar(float atual, int alvo, float passo) {
+int aproximar(int atual, int alvo, int passo) {
   if (atual < alvo) {
     atual += passo;
     if (atual > alvo) atual = alvo;
@@ -63,20 +72,46 @@ float aproximar(float atual, int alvo, float passo) {
   return atual;
 }
 
+// Aplica um valor com sinal em um motor: zera o sentido oposto ANTES de ligar o outro
+void escreveMotor(int pinoFrente, int pinoTras, int valor) {
+  if (valor > 0) {
+    ledcWrite(pinoTras, 0);
+    ledcWrite(pinoFrente, valor);
+  } else if (valor < 0) {
+    ledcWrite(pinoFrente, 0);
+    ledcWrite(pinoTras, -valor);
+  } else {
+    ledcWrite(pinoFrente, 0);
+    ledcWrite(pinoTras, 0);
+  }
+}
+
+// Parada imediata, sem rampa (emergência e perda de conexão)
+void paradaImediata() {
+  sentidoAtual = 'P';
+  alvoEsq = 0;  alvoDir = 0;
+  atualEsq = 0; atualDir = 0;
+  escreveMotor(ESQ_FRENTE, ESQ_TRAS, 0);
+  escreveMotor(DIR_FRENTE, DIR_TRAS, 0);
+}
+
 // Função contínua que aplica o PWM gradualmente sem travar o processador
 void atualizarAceleracao() {
   unsigned long agora = millis();
   if (agora - tempoAnteriorAcel >= INTERVALO_ACEL) {
     tempoAnteriorAcel = agora;
 
-    currentA = aproximar(currentA, targetA, PASSO_ACEL);
-    currentB = aproximar(currentB, targetB, PASSO_ACEL);
-    currentC = aproximar(currentC, targetC, PASSO_ACEL);
-    currentD = aproximar(currentD, targetD, PASSO_ACEL);
+    // Só mexe no PWM quando o valor mudou (parado ou já na velocidade alvo, não escreve nada)
+    int novoEsq = aproximar(atualEsq, alvoEsq, PASSO_ACEL);
+    if (novoEsq != atualEsq) {
+      atualEsq = novoEsq;
+      escreveMotor(ESQ_FRENTE, ESQ_TRAS, atualEsq);
+    }
 
-    ledcWrite(0, (int)currentA);
-    ledcWrite(1, (int)currentB);
-    ledcWrite(2, (int)currentC);
-    ledcWrite(3, (int)currentD);
+    int novoDir = aproximar(atualDir, alvoDir, PASSO_ACEL);
+    if (novoDir != atualDir) {
+      atualDir = novoDir;
+      escreveMotor(DIR_FRENTE, DIR_TRAS, atualDir);
+    }
   }
 }

@@ -4,6 +4,7 @@
 #include <Adafruit_SSD1306.h>  // controlador do display
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1); // display 128x64, sem pino de reset
+bool displayOk = false;                        // fica true se o display responder
 
 // Imagem do logo (1024 bytes, 128x64 pixels)
 static const uint8_t image_data_Mekhos[1024] = {
@@ -73,22 +74,13 @@ static const uint8_t image_data_Mekhos[1024] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-// Limpa a tela e escreve um texto no meio (tam = tamanho da letra)
-void mostraTexto(String texto, int tam) {
-  display.clearDisplay();                // apaga a tela
-  display.setTextSize(tam);              // tamanho da letra
-  display.setTextColor(SSD1306_WHITE);   // cor branca
-  display.setCursor(10, 20);             // posição (x, y)
-  display.println(texto);                // escreve o texto
-  display.display();                     // mostra na tela
-}
-
 // Liga o display e mostra o logo por 2 segundos
 void logoMekhos() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // 0x3C é o endereço I2C do display
-    Serial.println("Display nao encontrado");
-    for (;;);                                       // sem display o programa para aqui
+    Serial.println("Display nao encontrado");       // sem display o robô continua funcionando
+    return;
   }
+  displayOk = true;
   display.clearDisplay();
   display.drawBitmap(0, 0, image_data_Mekhos, 128, 64, 1); // desenha o logo
   display.display();
@@ -97,6 +89,7 @@ void logoMekhos() {
 
 // Mostra no display o nome da rede, a senha e o IP para abrir no navegador
 void LCDprintIP(const char* rede, const char* senha) {
+  if (!displayOk) return;               // sem display, não faz nada
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);

@@ -224,7 +224,7 @@ const char webpageCode[] PROGMEM = R"=====(
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      border: 0;
     }
 
     /* ---------- Botão de emergência: separado, grande e sempre liberado ---------- */
@@ -595,6 +595,87 @@ const char webpageCode[] PROGMEM = R"=====(
     @media (min-width: 1000px) and (max-height: 760px) {
       #tempo-ativo, #tempo-uv { font-size: 1.6rem; }
     }
+
+    /* Configuracoes de imagem da ESP32-CAM oficial */
+    .camera-acao {
+      margin-left: auto;
+      padding: 5px 10px;
+      font: inherit;
+      color: #ffffff;
+      background: var(--primary-blue);
+      border: 0;
+      border-radius: 7px;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .camera-acao:hover { background: var(--primary-hover); }
+    #camera { display: block; object-fit: contain; }
+    .modal-camera-caixa {
+      width: min(96vw, 680px);
+      max-width: 680px;
+      max-height: 90vh;
+      max-height: 90dvh;
+      overflow-y: auto;
+      border-color: var(--primary-blue);
+    }
+    .modal-camera-caixa .modal-titulo {
+      background: var(--header-bg);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .camera-fechar {
+      border: 1px solid rgba(255,255,255,.5);
+      border-radius: 6px;
+      background: transparent;
+      color: white;
+      padding: 4px 9px;
+      cursor: pointer;
+      font-size: 1.05rem;
+    }
+    .camera-status {
+      padding: 10px 14px;
+      font-size: .85rem;
+      color: var(--text-muted);
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .camera-status.erro { color: #b91c1c; background: #fef2f2; }
+    .camera-grade {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 13px;
+    }
+    .camera-campo { display: flex; flex-direction: column; gap: 5px; }
+    .camera-campo label { font-size: .83rem; font-weight: 600; }
+    .camera-campo select, .camera-campo input {
+      width: 100%;
+      min-height: 38px;
+      padding: 6px 9px;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      color: var(--text-dark);
+      background: white;
+      font-size: .91rem;
+    }
+    .camera-campo input[type="range"] { padding: 0; min-height: 32px; accent-color: var(--primary-blue); }
+    .camera-campo .camera-leitura { color: var(--text-muted); font-weight: normal; }
+    .camera-rodape { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
+    .camera-rodape button {
+      cursor: pointer;
+      padding: 9px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--border-color);
+      background: var(--btn-bg);
+      color: var(--text-dark);
+    }
+    .camera-campo.largura-total { grid-column: 1 / -1; }
+    @media (max-width: 560px) {
+      .camera-grade { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body oncontextmenu="return false">
@@ -696,11 +777,11 @@ const char webpageCode[] PROGMEM = R"=====(
       <div class="card card-video">
         <div class="card-header">
           <span>Monitoramento de Vídeo</span>
-          <span>&#128065;</span>
+          <button type="button" class="camera-acao" id="abrir-camera" aria-haspopup="dialog">&#9881; Ajustar câmera</button>
         </div>
         <div class="card-body">
           <div class="video-container">
-            <img id="camera" src="http://192.168.0.176:8080/video" alt="Câmera do Robô">
+            <img id="camera" src="http://192.168.4.100:81/stream" alt="Vídeo ao vivo da câmera do RoboLight">
           </div>
         </div>
       </div>
@@ -739,6 +820,143 @@ const char webpageCode[] PROGMEM = R"=====(
       <div class="modal-botoes">
         <button id="btn-uv-cancelar">Cancelar</button>
         <button id="btn-uv-confirmar" disabled>Ligar UVC</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Painel de ajustes da ESP32-CAM. Usa a API oficial, sem iframe. -->
+  <div id="modal-camera" class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-camera">
+    <div class="modal-caixa modal-camera-caixa">
+      <div class="modal-titulo">
+        <span id="titulo-camera">Configurações da câmera</span>
+        <button type="button" id="fechar-camera" class="camera-fechar" aria-label="Fechar ajustes da câmera">&#10005;</button>
+      </div>
+      <p id="camera-status" class="camera-status" role="status" aria-live="polite">Consultando a câmera...</p>
+      <div class="camera-grade">
+        <div class="camera-campo">
+          <label for="cam-resolucao">Resolução</label>
+          <select id="cam-resolucao" data-camera-var="framesize">
+            <option value="1">QQVGA (160 × 120)</option>
+            <option value="3">HQVGA (240 × 176)</option>
+            <option value="5">QVGA (320 × 240)</option>
+            <option value="6">CIF (400 × 296)</option>
+            <option value="8">VGA (640 × 480)</option>
+            <option value="9">SVGA (800 × 600)</option>
+            <option value="10">XGA (1024 × 768)</option>
+            <option value="12">SXGA (1280 × 1024)</option>
+            <option value="13">UXGA (1600 × 1200)</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-qualidade">Qualidade JPEG <span id="cam-qualidade-valor" class="camera-leitura">20</span></label>
+          <input id="cam-qualidade" type="range" min="10" max="40" value="20" step="1" data-camera-var="quality" data-camera-output="cam-qualidade-valor">
+        </div>
+        <div class="camera-campo">
+          <label for="cam-efeito">Filtro de imagem</label>
+          <select id="cam-efeito" data-camera-var="special_effect">
+            <option value="0">Normal</option>
+            <option value="1">Negativo</option>
+            <option value="2">Preto e branco</option>
+            <option value="3">Tonalidade vermelha</option>
+            <option value="4">Tonalidade verde</option>
+            <option value="5">Tonalidade azul</option>
+            <option value="6">Sépia</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-wbmode">Iluminação / branco</label>
+          <select id="cam-wbmode" data-camera-var="wb_mode">
+            <option value="0">Automático</option>
+            <option value="1">Ensolarado</option>
+            <option value="2">Nublado</option>
+            <option value="3">Escritório</option>
+            <option value="4">Casa</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-brilho">Brilho <span id="cam-brilho-valor" class="camera-leitura">0</span></label>
+          <input id="cam-brilho" type="range" min="-2" max="2" step="1" value="0" data-camera-var="brightness" data-camera-output="cam-brilho-valor">
+        </div>
+        <div class="camera-campo">
+          <label for="cam-contraste">Contraste <span id="cam-contraste-valor" class="camera-leitura">0</span></label>
+          <input id="cam-contraste" type="range" min="-2" max="2" step="1" value="0" data-camera-var="contrast" data-camera-output="cam-contraste-valor">
+        </div>
+        <div class="camera-campo">
+          <label for="cam-saturacao">Saturação <span id="cam-saturacao-valor" class="camera-leitura">0</span></label>
+          <input id="cam-saturacao" type="range" min="-2" max="2" step="1" value="0" data-camera-var="saturation" data-camera-output="cam-saturacao-valor">
+        </div>
+        <div class="camera-campo">
+          <label for="cam-exposicao">Compensação de exposição</label>
+          <select id="cam-exposicao" data-camera-var="ae_level">
+            <option value="-2">-2</option><option value="-1">-1</option>
+            <option value="0">0</option><option value="1">+1</option><option value="2">+2</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-awb">Balanço de branco automático</label>
+          <select id="cam-awb" data-camera-var="awb">
+            <option value="1">Ligado</option><option value="0">Desligado</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-aec">Exposição automática</label>
+          <select id="cam-aec" data-camera-var="aec">
+            <option value="1">Ligada</option><option value="0">Desligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-agc">Ganho automático</label>
+          <select id="cam-agc" data-camera-var="agc">
+            <option value="1">Ligado</option><option value="0">Desligado</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-espelho">Espelhamento horizontal</label>
+          <select id="cam-espelho" data-camera-var="hmirror">
+            <option value="0">Desligado</option><option value="1">Ligado</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-vertical">Inversão vertical</label>
+          <select id="cam-vertical" data-camera-var="vflip">
+            <option value="0">Desligada</option><option value="1">Ligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-lenc">Correção de lente</label>
+          <select id="cam-lenc" data-camera-var="lenc">
+            <option value="1">Ligada</option><option value="0">Desligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-wpc">Correção de pixels brancos</label>
+          <select id="cam-wpc" data-camera-var="wpc">
+            <option value="1">Ligada</option><option value="0">Desligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-bpc">Correção de pixels pretos</label>
+          <select id="cam-bpc" data-camera-var="bpc">
+            <option value="0">Desligada</option><option value="1">Ligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-gamma">Correção gama</label>
+          <select id="cam-gamma" data-camera-var="raw_gma">
+            <option value="1">Ligada</option><option value="0">Desligada</option>
+          </select>
+        </div>
+        <div class="camera-campo">
+          <label for="cam-dcw">Redução de imagem por hardware</label>
+          <select id="cam-dcw" data-camera-var="dcw">
+            <option value="1">Ligada</option><option value="0">Desligada</option>
+          </select>
+        </div>
+      </div>
+      <div class="camera-rodape">
+        <button type="button" id="atualizar-camera">Atualizar valores</button>
+        <button type="button" id="fechar-camera-rodape">Fechar</button>
       </div>
     </div>
   </div>
@@ -812,8 +1030,7 @@ const char webpageCode[] PROGMEM = R"=====(
 
     function emergencia() {
       movendo = false;
-      enviar('P');
-      enviar('UVOFF');
+      enviar('X');   // o robô para sem rampa e apaga as UVC
     }
 
     function mostrarUv(ativo) {
@@ -989,8 +1206,7 @@ const char webpageCode[] PROGMEM = R"=====(
 
     function desligarRobo() {
       movendo = false;
-      enviar('P');
-      enviar('UVOFF');
+      enviar('X');
       fecharModalUv();
       ligado = false;
       pararContador();
@@ -1021,9 +1237,17 @@ const char webpageCode[] PROGMEM = R"=====(
       ' ': ['P', 'btn-stop']
     };
 
+    var teclasPressionadas = [];   // teclas de direção seguradas, na ordem em que foram apertadas
+
     document.addEventListener('keydown', function (e) {
+      if (modalCamera.classList.contains('aberto')) {
+        if (e.key === 'Escape') { e.preventDefault(); fecharModalCamera(); }
+        else if (e.key === ' ') { e.preventDefault(); emergencia(); }
+        return;
+      }
       if (e.target.type == 'checkbox') return;
-      var t = teclas[e.key.toLowerCase()];
+      var k = e.key.toLowerCase();
+      var t = teclas[k];
       if (!t || e.repeat) return;
       if (!ligado && t[0] != 'P') return;
       if (modalUv.classList.contains('aberto') && t[0] != 'P') return;
@@ -1031,17 +1255,121 @@ const char webpageCode[] PROGMEM = R"=====(
       if (t[0] == 'P') {
         emergencia();
       } else {
+        if (teclasPressionadas.indexOf(k) < 0) teclasPressionadas.push(k);
         iniciar(t[0]);
       }
       document.getElementById(t[1]).classList.add('active-press');
     });
 
     document.addEventListener('keyup', function (e) {
+      if (modalCamera.classList.contains('aberto')) return;
       if (e.target.type == 'checkbox') return;
-      var t = teclas[e.key.toLowerCase()];
+      var k = e.key.toLowerCase();
+      var t = teclas[k];
       if (!t) return;
-      parar();
       document.getElementById(t[1]).classList.remove('active-press');
+      if (t[0] == 'P') return;
+      var i = teclasPressionadas.indexOf(k);
+      if (i >= 0) teclasPressionadas.splice(i, 1);
+      if (teclasPressionadas.length == 0) {
+        parar();
+      } else {
+        // ainda há outra tecla segurada: segue na direção dela
+        iniciar(teclas[teclasPressionadas[teclasPressionadas.length - 1]][0]);
+      }
+    });
+
+    // Se a janela perder o foco com tecla segurada, o keyup nunca chega: para o robô
+    window.addEventListener('blur', function () {
+      teclasPressionadas = [];
+      parar();
+    });
+
+
+    // ==============================================================
+    // API OFICIAL DA ESP32-CAM (porta 80 da placa secundaria)
+    // Nao altera o WebSocket, as UVC ou os comandos do robo.
+    // ==============================================================
+    var CAMERA_API = 'http://192.168.4.100';
+    var modalCamera = document.getElementById('modal-camera');
+    var cameraStatus = document.getElementById('camera-status');
+    var filaCamera = Promise.resolve();
+
+    function mensagemCamera(texto, erro) {
+      cameraStatus.textContent = texto;
+      cameraStatus.classList.toggle('erro', !!erro);
+    }
+
+    function atualizarValoresCamera(dados) {
+      document.querySelectorAll('[data-camera-var]').forEach(function (campo) {
+        var nome = campo.getAttribute('data-camera-var');
+        if (Object.prototype.hasOwnProperty.call(dados, nome)) {
+          campo.value = String(dados[nome]);
+          var saida = campo.getAttribute('data-camera-output');
+          if (saida) document.getElementById(saida).textContent = campo.value;
+        }
+      });
+    }
+
+    async function lerConfiguracoesCamera() {
+      mensagemCamera('Consultando ESP32-CAM...');
+      try {
+        var resposta = await fetch(CAMERA_API + '/status', { cache: 'no-store' });
+        if (!resposta.ok) throw new Error('HTTP ' + resposta.status);
+        var dados = await resposta.json();
+        atualizarValoresCamera(dados);
+        mensagemCamera('Conectada. Ajustes aplicados diretamente ao vídeo.');
+      } catch (erro) {
+        mensagemCamera('Não foi possível consultar a câmera em 192.168.4.100. Verifique a conexão com a rede RoboLight e o CameraWebServer.', true);
+      }
+    }
+
+    function alterarCamera(nome, valor) {
+      // Evita requisicoes concorrentes quando varios ajustes sao modificados.
+      filaCamera = filaCamera.catch(function () {}).then(async function () {
+        mensagemCamera('Aplicando ' + nome + '...');
+        try {
+          var url = CAMERA_API + '/control?var=' + encodeURIComponent(nome) + '&val=' + encodeURIComponent(valor);
+          var resposta = await fetch(url, { cache: 'no-store' });
+          if (!resposta.ok) throw new Error('HTTP ' + resposta.status);
+          mensagemCamera('Ajuste aplicado.');
+        } catch (erro) {
+          mensagemCamera('Falha ao aplicar ' + nome + '. Confirme que a ESP32-CAM está conectada.', true);
+        }
+      });
+    }
+
+    function abrirModalCamera() {
+      // Para o movimento antes de permitir ajustes de imagem.
+      pararRobo();
+      teclasPressionadas = [];
+      modalCamera.classList.add('aberto');
+      document.getElementById('fechar-camera').focus();
+      lerConfiguracoesCamera();
+    }
+
+    function fecharModalCamera() {
+      modalCamera.classList.remove('aberto');
+      document.getElementById('abrir-camera').focus();
+    }
+
+    document.getElementById('abrir-camera').addEventListener('click', abrirModalCamera);
+    document.getElementById('fechar-camera').addEventListener('click', fecharModalCamera);
+    document.getElementById('fechar-camera-rodape').addEventListener('click', fecharModalCamera);
+    document.getElementById('atualizar-camera').addEventListener('click', lerConfiguracoesCamera);
+    modalCamera.addEventListener('click', function (e) {
+      if (e.target === modalCamera) fecharModalCamera();
+    });
+
+    document.querySelectorAll('[data-camera-var]').forEach(function (campo) {
+      campo.addEventListener('input', function () {
+        var saida = campo.getAttribute('data-camera-output');
+        if (saida) document.getElementById(saida).textContent = campo.value;
+      });
+      // Envia somente ao soltar o slider, evitando sobrecarregar o Wi-Fi.
+      campo.addEventListener('change', function () {
+        alterarCamera(campo.getAttribute('data-camera-var'), campo.value);
+      });
     });
 
     window.onload = function () {

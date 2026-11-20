@@ -3,12 +3,13 @@
 #include <WebServer.h>         // servidor web simples (porta 80)
 #include <WebSocketsServer.h>  // comunicação em tempo real com a página (porta 81)
 
-#define LED 2                  // pino do LED da placa, controlado pela página
-#define LED2 32                // pino da luz auxiliar, controlada pelo mesmo botão
+#define LED 2                  // LED da placa: acompanha o estado das lâmpadas UVC
+#define UVC 32                 // pino que aciona as lâmpadas UVC (relé)
+const int UVC_NIVEL_LIGADO = LOW;   // use LOW se o seu relé liga com nível baixo
 
 WebServer server(80);                  // servidor que entrega a página HTML
 WebSocketsServer webSocket(81);        // servidor que recebe os comandos dos botões
-bool LEDonoff = false;                 // guarda se o LED está ligado (true) ou desligado (false)
+bool uvcLigado = false;                // guarda se as lâmpadas UVC estão ligadas
 
 // Os arquivos abaixo precisam ficar na mesma pasta do .ino
 // (a ordem importa: um usa o que o anterior criou)
@@ -20,11 +21,13 @@ bool LEDonoff = false;                 // guarda se o LED está ligado (true) ou
 
 void setup() {
   Serial.begin(115200);                  // liga o monitor serial para mensagens de teste
-  pinMode(LED, OUTPUT);                  // LED é saída
-  pinMode(LED2, OUTPUT);                 // luz auxiliar é saída
+  pinMode(LED, OUTPUT);
+  pinMode(UVC, OUTPUT);
+  ligaUVC(false);                        // garante as lâmpadas desligadas ao ligar o robô
 
   Init_PonteH();                         // configura os pinos PWM das pontes H
-  logoMekhos();                          // mostra o logo no display
+
+  logoMekhos();                          // mostra o logo no display (se houver)
   Init_wifi();                           // cria a rede Wi-Fi
   LCDprintIP(AP_SSID, AP_SENHA);         // mostra no display o nome, a senha e o IP da rede
 
@@ -32,6 +35,7 @@ void setup() {
   server.begin();                        // inicia o servidor web
   webSocket.begin();                     // inicia o servidor WebSocket
   webSocket.onEvent(webSocketEvent);     // diz qual função trata as mensagens recebidas
+  webSocket.enableHeartbeat(2000, 1000, 2); // testa o cliente a cada 2s; se não responder, dispara DISCONNECTED
 }
 
 void loop() {
