@@ -78,7 +78,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
 | **GND comum** | **GND** | Referência comum |
 
 <p align="center">
-  <img src="images/placas_e_componentes/ESP32.jpg" alt="Pinagem do ESP32 no RoboLight" width="380">
+  <img src="imagens/placas_e_componentes/ESP32.jpg" alt="Pinagem do ESP32 no RoboLight" width="380">
 </p>
 
 ### 2. Detalhes de conexão dos módulos
@@ -90,7 +90,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   - `R_EN` e `L_EN`: em **nível alto (5V)** permanente.
 
   <p align="center">
-    <img src="images/placas_e_componentes/BTS7960.jpg" alt="Pinagem da ponte H BTS7960 (IBT-2)" width="380">
+    <img src="imagens/placas_e_componentes/BTS7960.jpg" alt="Pinagem da ponte H BTS7960 (IBT-2)" width="380">
   </p>
 
 - **Display OLED SSD1306:**
@@ -99,7 +99,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   - `SDA`: **GPIO 21** do ESP32.
 
   <p align="center">
-    <img src="images/placas_e_componentes/OLED.jpg" alt="Pinagem do display OLED SSD1306" width="260">
+    <img src="imagens/placas_e_componentes/OLED.jpg" alt="Pinagem do display OLED SSD1306" width="260">
   </p>
 
 - **Módulo relé (FE_SRly):**
@@ -109,7 +109,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   - `COM` e `NO` (normalmente aberto): interrompem a fase (L) de 220V AC entre o inversor e os reatores.
 
 <p align="center">
-  <img src="images/placas_e_componentes/RELAY.jpg" alt="Pinagem do módulo relé" width="220">
+  <img src="imagens/placas_e_componentes/RELAY.jpg" alt="Pinagem do módulo relé" width="220">
 </p>
 
 - **Regulador Step-Down LM2596:**
@@ -117,7 +117,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   - `OUT+` / `OUT-`: regulados em **5,0V** para alimentar o ESP32, o relé e a lógica das pontes H.
 
 <p align="center">
-  <img src="images/placas_e_componentes/DC5V.jpg" alt="Pinagem do regulador LM2596" width="200">
+  <img src="imagens/placas_e_componentes/DC5V.jpg" alt="Pinagem do regulador LM2596" width="200">
 </p>
 
 ## 🗂️ Estrutura do Repositório
@@ -137,7 +137,7 @@ RoboLight/
 │   ├── controle_wifi_2pontes/     # teste das duas pontes H e gamepad
 │   └── teste_rele_uvc/            # teste do módulo relé / UV-C
 ├── doc/                           # dossiê técnico e guia do IP Webcam (PDF)
-├── images/                        # esquemáticos, fotos de placas e testes
+├── imagens/                        # esquemáticos, fotos de placas e testes
 └── videos/                        # vídeos dos testes
 ```
 
@@ -232,7 +232,7 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) de todos os 3 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os três reatores simultaneamente.
 
 <p align="center">
-  <img src="images/esquematicos/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
+  <img src="imagens/esquematicos/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
 </p>
 
 ---
@@ -257,7 +257,7 @@ Sketch para testar individualmente a tração das duas pontes H, com suporte nat
 
 **Esquemático da versão de teste das duas pontes H** (Cirkit Designer):
 
-![Esquemático da versão de teste das duas pontes H com ESP32](images/esquematicos/versao_testes_pontes.png)
+![Esquemático da versão de teste das duas pontes H com ESP32](imagens/esquematicos/versao_testes_pontes.png)
 
 Código: [`testes/controle_wifi_2pontes/`](testes/controle_wifi_2pontes/) (`controle_wifi_2pontes.ino` e `new_html_pages_gamepad.h`).
 
