@@ -12,7 +12,10 @@ O **RoboLight** é um protótipo de robô móvel de duas rodas para desinfecçã
 - [Estrutura do Repositório](#️-estrutura-do-repositório)
 - [Estrutura do Código (Firmware)](#-estrutura-do-código-firmware)
 - [Configuração do Ambiente e Requisitos](#-configuração-do-ambiente-e-requisitos)
+- [Configuração da ESP32-CAM](#configuração-da-esp32-cam)
 - [Protocolo de Comunicação](#-protocolo-de-comunicação)
+- [Controle de Aceleração Suave](#-controle-de-aceleração-suave-soft-start)
+- [Sistema de Ligação das Lâmpadas UVC](#sistema-de-ligação-das-lâmpadas-uvc)
 - [Procedimento de Testes e Validação](#-procedimento-de-testes-e-validação)
 - [Protocolo e Matriz de Segurança](#-protocolo-e-matriz-de-segurança)
 - [Diagnóstico de Falhas (Troubleshooting)](#-diagnóstico-de-falhas-troubleshooting)
@@ -24,8 +27,8 @@ O **RoboLight** é um protótipo de robô móvel de duas rodas para desinfecçã
 O ESP32 executa um servidor web (porta 80) e um servidor WebSocket (porta 81). Ao conectar qualquer dispositivo (computador, smartphone ou tablet) à rede Wi-Fi gerada pelo robô e acessar `192.168.4.1`, o operador pode:
 
 - **Movimentar o robô em 8 direções:** controle proporcional de velocidade e direção (frente, trás, esquerda, direita e diagonais).
-- **Acionar a desinfecção com segurança:** liga e desliga remotamente o circuito de potência das lâmpadas UV-C por meio de um módulo relé.
-- **Monitorar em tempo real:** estado do sistema no display OLED SSD1306 e vídeo ao vivo de uma câmera IP integrada à página via `iframe`.
+- **Controlar as lâmpadas UV-C:** liga e desliga remotamente o circuito de potência por meio de um módulo relé.
+- **Monitorar em tempo real:** o OLED SSD1306 exibe os dados da rede, e o painel web mostra o vídeo MJPEG da ESP32-CAM e oferece ajustes da câmera.
 
 ---
 
@@ -35,10 +38,9 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
 
 ### Dimensionamento dos emissores
 
-- **Lâmpadas germicidas:** 5x **OSRAM PURITEC HNS 30W G13** (T8, 90 cm, 254 nm monocromática, *ozone-free*).
-- **Reatores eletrônicos:** 3x **Philips Basic EB240A16/26 P Bivolt (110/220V)**.
-  - Distribuição: Reator 1 (2x 30W), Reator 2 (2x 30W) e Reator 3 (1x 30W). Potência total de emissão: **150W**.
-- **Alimentação AC de potência:** inversor DC/AC de 12V para 220V (1000W), exigindo corrente média de 15A do banco de baterias de 12V.
+- **Lâmpadas germicidas:** 6x **OSRAM PURITEC HNS 30W G13** (T8, 90 cm, 254 nm monocromática, *ozone-free*), com potência nominal total de **180 W**.
+- **Reatores eletrônicos:** 6x **Philips Basic EB240A16/26 P Bivolt (110/220V)**.
+- **Alimentação AC de potência:** inversor DC/AC de 12V para 220V (1000W).
 
 ---
 
@@ -47,6 +49,7 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
 | Componente | Qtd. | Especificação / Observação |
 | :--- | :---: | :--- |
 | **ESP32** | 1 | Placa de desenvolvimento (NodeMCU / Dev Module de 30 ou 38 pinos) |
+| **ESP32-CAM (OV2640)** | 1 | Módulo AI Thinker com câmera OV2640 e firmware próprio |
 | **Ponte H BTS7960 (IBT-2)** | 2 | Driver de alta corrente para motores CC (1 por motor) |
 | **Motores CC com rodas** | 2 | Compatíveis com o chassi do robô |
 | **Display OLED SSD1306** | 1 | 128x64 pixels, comunicação I²C (endereço `0x3C`) |
@@ -67,7 +70,6 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
 | :--- | :---: | :--- |
 | **Módulo relé (UV-C)** | **GPIO 32** | Pino de sinal (`S` / `IN`) do módulo relé |
 | **LED onboard / status** | **GPIO 2** | Indicador visual integrado à placa |
-| **Luz auxiliar / status** | **GPIO 32** | Sinalizador secundário de acionamento |
 | **Ponte H 1 (motor esquerdo) — sentido 1** | **GPIO 26** | `RPWM` da Ponte H 1 |
 | **Ponte H 1 (motor esquerdo) — sentido 2** | **GPIO 27** | `LPWM` da Ponte H 1 |
 | **Ponte H 2 (motor direito) — sentido 1** | **GPIO 5** | `RPWM` da Ponte H 2 |
@@ -120,22 +122,32 @@ A radiação germicida na faixa UV-C (200 nm a 280 nm) provoca a formação de d
   <img src="imagens/placas_e_componentes/DC5V.jpg" alt="Pinagem do regulador LM2596" width="200">
 </p>
 
+### 3. Esquemático geral do RoboLight
+
+<p align="center">
+  <img src="imagens/esquematicos/esquema_robo.png" alt="Esquemático geral do robô RoboLight" width="800">
+</p>
+
 ## 🗂️ Estrutura do Repositório
 
 ```
 RoboLight/
 ├── README.md
 ├── firmware/
-│   └── RoboLight/                 # firmware principal (v3.0)
-│       ├── RoboLight.ino
-│       ├── html_page.h
-│       ├── PonteH.h
-│       ├── LCD.h
-│       ├── WiFiAP.h
-│       └── functions.h
+│   ├── RoboLight/                 # firmware principal
+│   │   ├── RoboLight.ino
+│   │   ├── html_page.h
+│   │   ├── PonteH.h
+│   │   ├── LCD.h
+│   │   ├── WiFiAP.h
+│   │   └── functions.h
+│   └── codigo_espcam/
+│       └── ESPCAM_ROBOLIGHT/      # firmware da câmera
 ├── testes/
 │   ├── controle_wifi_2pontes/     # teste das duas pontes H e gamepad
-│   └── teste_rele_uvc/            # teste do módulo relé / UV-C
+│   ├── teste_rele_uvc/            # teste do módulo relé / UV-C
+│   ├── teste_pagina_html/         # página de teste da interface
+│   └── robolight_teste.html      # página de teste independente
 ├── doc/                           # dossiê técnico e guia do IP Webcam (PDF)
 ├── imagens/                        # esquemáticos, fotos de placas e testes
 └── videos/                        # vídeos dos testes
@@ -165,16 +177,25 @@ O firmware completo está em [`firmware/RoboLight/`](firmware/RoboLight/) (`Robo
 
 ## ⚙️ Configuração do Ambiente e Requisitos
 
-- **IDE:** Arduino IDE, com o pacote de placas ESP32 na série **2.x** (ex.: v2.0.17).
+- **Firmware principal:** Arduino IDE com o pacote de placas ESP32 da Espressif na série **2.x** (ex.: v2.0.17).
 - **Atenção:** a série 3.x do pacote ESP32 altera as funções de PWM (`ledcSetup` e `ledcAttachPin`), sendo incompatível sem adaptações.
 - **Driver:** Silicon Labs CP210x USB to UART Bridge.
 - **Bibliotecas necessárias:**
-  - ESP32 (Espressif Systems)
-  - WebServer (Espressif Systems)
   - WebSockets, de Markus Sattler (Links2004)
   - Adafruit GFX Library
   - Adafruit SSD1306
   - Adafruit BusIO
+
+`WiFi`, `WebServer` e `Wire` vêm com o pacote de placas ESP32.
+
+## Configuração da ESP32-CAM
+
+1. Abra [ESPCAM_ROBOLIGHT.ino](firmware/codigo_espcam/ESPCAM_ROBOLIGHT/ESPCAM_ROBOLIGHT.ino) na Arduino IDE. Mantenha os arquivos do sketch, incluindo `partitions.csv`, na mesma pasta. O modelo AI Thinker está definido em `board_config.h`.
+2. Grave o sketch na ESP32-CAM. Se a placa não tiver interface USB integrada, use uma base de gravação ou um adaptador USB–serial compatível.
+3. Ligue o ESP32 principal para disponibilizar a rede `RoboLight`. A câmera se conecta a essa rede com IP fixo `192.168.4.100`. Se mudar o nome ou a senha da rede em `WiFiAP.h`, atualize os mesmos dados no sketch da câmera.
+4. Conecte o celular ou computador à mesma rede e abra o painel do robô em `http://192.168.4.1/`. A câmera também oferece painel próprio em `http://192.168.4.100/` e vídeo direto em `http://192.168.4.100:81/stream`.
+
+O guia em [guia_ipwebcam.pdf](doc/guia_ipwebcam.pdf) documenta a opção com o aplicativo IP Webcam.
 
 ---
 
@@ -184,13 +205,14 @@ Mensagens enviadas da interface web ➔ ESP32:
 
 | Comando | Ação executada |
 | :--- | :--- |
-| `ComandoDirecao=F` | Movimento para frente |
-| `ComandoDirecao=T` | Movimento para trás |
-| `ComandoDirecao=E` | Rotação para a esquerda |
-| `ComandoDirecao=D` | Rotação para a direita |
-| `ComandoDirecao=P` | Para os motores imediatamente |
-| `LEDonoff=ON` / `OFF` | Liga ou desliga o módulo relé (lâmpadas UV-C) e os LEDs |
-| `Velocidade=<0-255>` | Define a velocidade dos motores (valor PWM de 0 a 255) |
+| `F` | Movimento para frente |
+| `T` | Movimento para trás |
+| `E` | Rotação para a esquerda |
+| `D` | Rotação para a direita |
+| `P` | Desacelera os motores até a parada |
+| `X` | Para os motores imediatamente e comanda o desligamento das lâmpadas UV-C |
+| `UVON` / `UVOFF` | Aciona ou desaciona o relé UV-C e o LED da placa |
+| `V<0–100>` | Define a velocidade em porcentagem. Exemplo: `V80` |
 
 ---
 
@@ -218,7 +240,7 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 > **⚠️ AVISO DE SEGURANÇA:** A luz UVC causa danos irreversíveis aos olhos e à pele. O sistema exige a implementação de intertravamentos (sensores de presença ou fim de curso) para garantir o desligamento imediato das lâmpadas caso haja humanos próximos.
 
 ### Componentes de Hardware
-* **Lâmpadas e Reatores:** 6x Lâmpadas UVC, alimentadas em pares por 3x Reatores Eletrônicos.
+* **Lâmpadas e reatores:** 6 lâmpadas UV-C e 6 reatores eletrônicos.
 * **Módulo de Acionamento:** Módulo Relé de 1 canal.
 * **Alimentação da Potência:** Bateria de 12V conectada a um Inversor de Tensão de 1000W (Saída 220V).
 * **Conexão AC:** Plug de tomada padrão macho conectado à saída do inversor.
@@ -227,9 +249,9 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 ### Arquitetura de Fiação
 1. **Lógica:** O pino de controle do ESP envia o sinal de ativação para a porta `IN` do módulo relé.
 2. **Potência Primária:** A bateria de 12V alimenta o inversor de 1000W, gerando a saída de 220V AC na tomada.
-3. **Distribuição do Neutro:** O cabo neutro do plug de tomada é derivado e conectado diretamente a todos os 3 reatores.
+3. **Distribuição do Neutro:** O cabo neutro do plug de tomada é derivado e conectado diretamente aos 6 reatores.
 4. **Seccionamento da Fase:** O cabo de fase que sai do plug de tomada é conectado ao borne **NO** (Normalmente Aberto) do relé.
-5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) de todos os 3 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os três reatores simultaneamente.
+5. **Alimentação dos Reatores:** Os cabos de entrada 220V (fase) dos 6 reatores são unidos e ligados em conjunto ao borne **COM** (Comum) do relé. Quando o ESP aciona o relé, o circuito fecha conectando o NO ao COM, energizando os seis reatores simultaneamente.
 
 <p align="center">
   <img src="imagens/esquematicos/ligacoes_lampadas.png" alt="ligações das lâmpadas" width="800">
@@ -239,19 +261,21 @@ O robô é equipado com um sistema de irradiação UVC contendo 6 lâmpadas para
 
 ## 🧪 Procedimento de Testes e Validação
 
-### Etapas 1 a 9 — Guia integrado
+### Teste do firmware principal
 
 1. **Verificação elétrica:** confirmar o GND comum e os pinos `R_EN`/`L_EN` em nível alto antes de ligar a bateria dos motores.
 2. **Upload e Monitor Serial:** gravar o código e abrir o monitor a 115200 baud. Confirmar a mensagem `Rede criada. IP: 192.168.4.1`.
 3. **Conexão e teste de rotação:** acessar `http://192.168.4.1` com as rodas do robô suspensas, para validar a polaridade e o sentido de rotação dos motores.
 
-### Etapa 10 — Teste individual do módulo relé / UV-C via Wi-Fi
+### Teste individual do módulo relé / UV-C via Wi-Fi
 
 Sketch em arquivo único que cria uma rede dedicada (`RoboLight-UVC-Test`) para testar o acionamento remoto do módulo relé (GPIO 32) em bancada.
 
+O acionamento do relé no protótipo foi confirmado com o firmware principal atual.
+
 Código: [`testes/teste_rele_uvc/teste_rele_uvc.ino`](testes/teste_rele_uvc/teste_rele_uvc.ino)
 
-### Etapa 11 — Teste de validação dos motores e gamepad
+### Teste de validação dos motores e gamepad
 
 Sketch para testar individualmente a tração das duas pontes H, com suporte nativo a gamepads USB/Bluetooth via Gamepad API. O arquivo `new_html_pages_gamepad.h` precisa ficar na mesma pasta do sketch.
 
@@ -265,11 +289,12 @@ Código: [`testes/controle_wifi_2pontes/`](testes/controle_wifi_2pontes/) (`cont
 
 ## 🚨 Protocolo e Matriz de Segurança
 
-O projeto adota proteção em três níveis para garantir operação clínica sem riscos:
+O firmware implementa as seguintes ações de desligamento:
 
-- **Nível 1 (software):** parada automática e imediata dos motores ao detectar desconexão do WebSocket (`WStype_DISCONNECTED`).
-- **Nível 2 (firmware):** resistor pull-down e estado `LOW` garantido no `setup()` para impedir o disparo involuntário das lâmpadas UV-C durante o boot do ESP32.
-- **Nível 3 (hardware / físico):** botoeira de emergência física e corte manual da alta potência.
+- Ao detectar uma desconexão do WebSocket (`WStype_DISCONNECTED`), o firmware para os motores imediatamente e comanda o desligamento das lâmpadas UV-C.
+- No `setup()`, o firmware comanda o desligamento do relé. Com a configuração atual de relé ativo em `LOW`, o nível de desligamento no GPIO 32 é `HIGH`.
+
+A botoeira física de emergência, o corte manual de potência e os intertravamentos citados neste documento dependem de confirmação no protótipo.
 
 **Equipamentos de Proteção Individual (EPIs):** uso obrigatório de óculos com proteção UV400, protetor facial integral (*face shield*) e luvas de nitrila em qualquer teste de bancada com lâmpadas expostas.
 
@@ -283,3 +308,4 @@ O projeto adota proteção em três níveis para garantir operação clínica se
 | Display OLED não encontrado (`0x3C`) | Falha de comunicação no barramento I²C | Verificar os pinos SDA (GPIO 21), SCL (GPIO 22) e a alimentação de 5V |
 | Relé UV-C não aciona | Fiação do pino de sinal ou GND incompleto | Inspecionar a conexão do GPIO 32 no pino S/IN do relé e o GND comum |
 | Erro de compilação em `ledcSetup` | Pacote de placas ESP32 na série 3.x | Usar o pacote ESP32 série 2.x (ex.: 2.0.17) no Gerenciador de Placas |
+| Vídeo da câmera indisponível | A câmera não entrou na rede do robô ou o servidor de vídeo não iniciou | Conferir a saída serial da câmera a 115200 baud e abrir `http://192.168.4.100:81/stream` a partir de um dispositivo conectado à rede do robô |
